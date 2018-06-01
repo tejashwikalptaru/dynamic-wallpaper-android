@@ -87,10 +87,7 @@ public class DetailsScreen extends AppCompatActivity implements IDownloadComplet
                     mDownloadButton.setText("Downloaded");
                     mDownloadButton.setEnabled(false);
                 } else {
-                    //new ImageDownloaderTask(mImageView).execute(mUrl);
-                    Glide.with(DetailsScreen.this)
-                            .load(mUrl)
-                            .into(mImageView);
+                    Glide.with(DetailsScreen.this).load(mUrl).into(mImageView);
                 }
             }
         });
@@ -99,6 +96,7 @@ public class DetailsScreen extends AppCompatActivity implements IDownloadComplet
         mDownloadButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                mDownloadButton.setEnabled(false);
                 if(isStoragePermissionGranted()){
                     if(mBitmap == null){
                         downloadImage();
@@ -113,10 +111,11 @@ public class DetailsScreen extends AppCompatActivity implements IDownloadComplet
         mSetWallpaper.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                mSetWallpaper.setEnabled(false);
+                applyWallpaper = true;
                 if(isStoragePermissionGranted()){
                     mSetWallpaper.setEnabled(false);
                     if(mBitmap == null){
-                        applyWallpaper = true;
                         downloadImage();
                     } else {
                         setWallpaper();
@@ -167,6 +166,9 @@ public class DetailsScreen extends AppCompatActivity implements IDownloadComplet
             Log.v(TAG,"Permission: " + permissions[0] + " was " + grantResults[0]);
             if(requestCode == REQUEST_WRITE){
                 if(mBitmap == null) {
+                    if(applyWallpaper == true){
+                        mSetWallpaper.setEnabled(false);
+                    }
                     downloadImage();
                 }
             }
@@ -281,6 +283,8 @@ class SavePhotoTask extends AsyncTask<Void, Void, Void> {
     private String path;
     private byte[] bytes;
     private IDownloadCompleteNotifier notifier;
+    private Bitmap bmp = null;
+    private String msg = "";
 
     SavePhotoTask(String path, byte[] bytes, IDownloadCompleteNotifier notifier){
         this.path = path;
@@ -289,17 +293,26 @@ class SavePhotoTask extends AsyncTask<Void, Void, Void> {
     }
 
     @Override
+    protected void onPostExecute(Void aVoid) {
+        super.onPostExecute(aVoid);
+        if(this.bmp != null){
+            notifier.onDownloadComplete(true, bmp);
+        } else {
+            notifier.onDownloadFailure(false, this.msg);
+        }
+    }
+
+    @Override
     protected Void doInBackground(Void... voids) {
         try {
             FileOutputStream fos=new FileOutputStream(this.path);
             fos.write(this.bytes);
             fos.close();
-            Bitmap bmp = BitmapFactory.decodeFile(this.path);
-            notifier.onDownloadComplete(true, bmp);
+            this.bmp = BitmapFactory.decodeFile(this.path);
         }
         catch (java.io.IOException e) {
-            Log.e("Picture-Saving-Task", "Exception in callback: " +  e.getMessage());
-            notifier.onDownloadFailure(false, e.getMessage());
+            this.msg = e.getMessage();
+            this.bmp = null;
         }
         return null;
     }
